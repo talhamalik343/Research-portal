@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Research Opportunity Portal</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; background: #f7f7f9; }
+  h1 { color: #222; }
+  form { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 25px; }
+  input, textarea, select { width: 100%; padding: 8px; margin: 6px 0 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+  button { padding: 8px 16px; border: none; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; margin-right: 6px; }
+  button.secondary { background: #6b7280; }
+  button.danger { background: #dc2626; }
+  .card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 12px; }
+  .card h3 { margin: 0 0 8px; }
+  .status-open { color: #16a34a; font-weight: bold; }
+  .status-closed { color: #dc2626; font-weight: bold; }
+  #message { padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none; }
+  .success { background: #dcfce7; color: #166534; }
+  .error { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+
+<h1>University Research Opportunity Portal</h1>
+<div id="message"></div>
+
+<form id="opportunityForm">
+  <h2 id="formTitle">Post a New Opportunity</h2>
+  <input type="hidden" id="opportunityId">
+  <label>Title</label>
+  <input type="text" id="title" required>
+  <label>Description</label>
+  <textarea id="description" required></textarea>
+  <label>Research Area</label>
+  <input type="text" id="research_area" required>
+  <label>Faculty Member's Name</label>
+  <input type="text" id="faculty_name" required>
+  <label>Department</label>
+  <input type="text" id="department" required>
+  <label>Required Skills</label>
+  <input type="text" id="required_skills" required>
+  <label>Available Positions</label>
+  <input type="number" id="available_positions" required min="1">
+  <label>Application Deadline</label>
+  <input type="date" id="application_deadline" required>
+  <button type="submit" id="submitBtn">Create Opportunity</button>
+  <button type="button" class="secondary" id="cancelEditBtn" style="display:none;">Cancel</button>
+</form>
+
+<h2>All Opportunities</h2>
+<div id="opportunityList"></div>
+
+<script>
+const API_URL = "http://localhost:5000/api/opportunities";
+const form = document.getElementById("opportunityForm");
+const listEl = document.getElementById("opportunityList");
+const messageEl = document.getElementById("message");
+const submitBtn = document.getElementById("submitBtn");
+const cancelEditBtn = document.getElementById("cancelEditBtn");
+const formTitle = document.getElementById("formTitle");
+
+function showMessage(text, type) {
+  messageEl.textContent = text;
+  messageEl.className = type;
+  messageEl.style.display = "block";
+  setTimeout(() => { messageEl.style.display = "none"; }, 4000);
+}
+
+function getFormData() {
+  return {
+    title: document.getElementById("title").value.trim(),
+    description: document.getElementById("description").value.trim(),
+    research_area: document.getElementById("research_area").value.trim(),
+    faculty_name: document.getElementById("faculty_name").value.trim(),
+    department: document.getElementById("department").value.trim(),
+    required_skills: document.getElementById("required_skills").value.trim(),
+    available_positions: document.getElementById("available_positions").value,
+    application_deadline: document.getElementById("application_deadline").value
+  };
+}
+
+function resetForm() {
+  form.reset();
+  document.getElementById("opportunityId").value = "";
+  submitBtn.textContent = "Create Opportunity";
+  formTitle.textContent = "Post a New Opportunity";
+  cancelEditBtn.style.display = "none";
+}
+
+async function loadOpportunities() {
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    listEl.innerHTML = "";
+    if (data.length === 0) {
+      listEl.innerHTML = "<p>No opportunities posted yet.</p>";
+      return;
+    }
+    data.forEach(op => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h3>${op.title}</h3>
+        <p>${op.description}</p>
+        <p><strong>Area:</strong> ${op.research_area} | <strong>Faculty:</strong> ${op.faculty_name} | <strong>Dept:</strong> ${op.department}</p>
+        <p><strong>Skills:</strong> ${op.required_skills} | <strong>Positions:</strong> ${op.available_positions}</p>
+        <p><strong>Deadline:</strong> ${op.application_deadline} | <strong>Status:</strong>
+          <span class="${op.status === 'Open' ? 'status-open' : 'status-closed'}">${op.status}</span>
+        </p>
+        <button class="secondary" onclick="editOpportunity(${op.id})">Edit</button>
+        <button onclick="toggleStatus(${op.id}, '${op.status}')">Toggle Status</button>
+        <button class="danger" onclick="deleteOpportunity(${op.id})">Delete</button>
+      `;
+      listEl.appendChild(card);
+    });
+  } catch (err) {
+    showMessage("Failed to load opportunities. Is the backend running?", "error");
+  }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("opportunityId").value;
+  const payload = getFormData();
+
+  try {
+    let res;
+    if (id) {
+      res = await fetch(`${API_URL}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    }
+    const result = await res.json();
+    if (!res.ok) {
+      showMessage(result.error || "Something went wrong", "error");
+      return;
+    }
+    showMessage(id ? "Opportunity updated" : "Opportunity created", "success");
+    resetForm();
+    loadOpportunities();
+  } catch (err) {
+    showMessage("Request failed. Is the backend running?", "error");
+  }
+});
+
+async function editOpportunity(id) {
+  const res = await fetch(`${API_URL}/${id}`);
+  const op = await res.json();
+  document.getElementById("opportunityId").value = op.id;
+  document.getElementById("title").value = op.title;
+  document.getElementById("description").value = op.description;
+  document.getElementById("research_area").value = op.research_area;
+  document.getElementById("faculty_name").value = op.faculty_name;
+  document.getElementById("department").value = op.department;
+  document.getElementById("required_skills").value = op.required_skills;
+  document.getElementById("available_positions").value = op.available_positions;
+  document.getElementById("application_deadline").value = op.application_deadline;
+  formTitle.textContent = "Edit Opportunity";
+  submitBtn.textContent = "Save Changes";
+  cancelEditBtn.style.display = "inline-block";
+  window.scrollTo(0, 0);
+}
+
+cancelEditBtn.addEventListener("click", resetForm);
+
+async function toggleStatus(id, currentStatus) {
+  const newStatus = currentStatus === "Open" ? "Closed" : "Open";
+  const res = await fetch(`${API_URL}/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: newStatus })
+  });
+  if (res.ok) {
+    showMessage(`Status changed to ${newStatus}`, "success");
+    loadOpportunities();
+  } else {
+    showMessage("Failed to update status", "error");
+  }
+}
+
+async function deleteOpportunity(id) {
+  if (!confirm("Delete this opportunity?")) return;
+  const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+  if (res.ok) {
+    showMessage("Opportunity deleted", "success");
+    loadOpportunities();
+  } else {
+    showMessage("Failed to delete opportunity", "error");
+  }
+}
+
+loadOpportunities();
+</script>
+</body>
+</html>
