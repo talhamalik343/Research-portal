@@ -1,4 +1,6 @@
 # University Research Opportunity Portal
+## repository link
+ https://github.com/talhamalik343/Research-portal
 ## Tech Stack
 - Backend: Python (Flask)
 - Database: MySQL
