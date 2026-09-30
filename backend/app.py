@@ -8,7 +8,7 @@ CORS(app)
 DB_CONFIG = {
     "host": "localhost",
    "user": "talha",
-   "password": "password",
+   "password": "xxxxx",
     "database": "research_portal"
 }
 
